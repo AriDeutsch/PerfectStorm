@@ -1,8 +1,10 @@
 import os
 from data.base_dataset import BaseDataset, get_transform
-from data.image_folder import make_dataset
+from data.image_folder import make_dataset, dynamic_normalisation
+from util.util import mkdirs
 from PIL import Image
 import random
+import json
 
 
 class UnalignedDataset(BaseDataset):
@@ -29,13 +31,32 @@ class UnalignedDataset(BaseDataset):
         self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))   # load images from '/path/to/data/trainA'
         self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size))    # load images from '/path/to/data/trainB'
         
+        stats_file = os.path.join(opt.checkpoints_dir, opt.name, 'stats.json') # file to save stats
+        
+        # Only calculate if train phase, if dyno requested, and no stats file exists already
+        if opt.isTrain and opt.dyno and not os.path.isfile(stats_file):        
+            self.opt.dyno_stats = dynamic_normalisation(self.A_paths,self.B_paths, grayscale = self.opt.Grey3Ch)
+            stats_file = os.path.join(opt.checkpoints_dir, opt.name, 'stats.json')
+            with open(stats_file, 'w') as f:
+                json.dump(self.opt.dyno_stats, f)   # save the stats 
+        # If the stats file exists, load the stats, regardless of phase
+        elif os.path.isfile(stats_file):
+            with open(stats_file, 'r') as f:
+                self.opt.dyno_stats = json.load(f)  # load the stats
+        else:
+            self.opt.dyno_stats = None  # If no stats file exists, and it's not train phase or no dyno requested, use standard 0.5 level stats
+            
+        
+ 
         self.A_size = len(self.A_paths)  # get the size of dataset A
         self.B_size = len(self.B_paths)  # get the size of dataset B
         btoA = self.opt.direction == 'BtoA'
         input_nc = self.opt.output_nc if btoA else self.opt.input_nc       # get the number of channels of input image
         output_nc = self.opt.input_nc if btoA else self.opt.output_nc      # get the number of channels of output image
-        self.transform_A = get_transform(self.opt, grayscale=(input_nc == 1))
-        self.transform_B = get_transform(self.opt, grayscale=(output_nc == 1))
+        if self.opt.Grey3Ch:
+            assert (input_nc==3 and output_nc==3), "Number of in and out channels should be 3 if you want 3 channel greyscale."
+        self.transform_A = get_transform(self.opt, grayscale=(input_nc == 1), Grey3Ch = self.opt.Grey3Ch, stats = self.opt.dyno_stats)
+        self.transform_B = get_transform(self.opt, grayscale=(output_nc == 1), Grey3Ch = self.opt.Grey3Ch, stats = self.opt.dyno_stats)
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.

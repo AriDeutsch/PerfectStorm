@@ -43,6 +43,7 @@ def dynamic_normalisation(trainA, trainB, grayscale = False):
     cancellation could ruin the natural precision. This does not 
     change the variance, and thus standard deviation, since Var(X) = Var(X-K)
     """
+    print('Calculating normalisation stats')
     paths = trainA+trainB
     Sums = []
     SSq = []
@@ -65,17 +66,22 @@ def dynamic_normalisation(trainA, trainB, grayscale = False):
     TotalSum = np.sum(Sums,axis=0) # sum the appended items along the axis of appending
     TotalSSq = np.sum(SSq,axis=0) # same as line above
     
-    mean = K + TotalSum/totalPix
+    mean = (K + TotalSum/totalPix).flatten().tolist()
     var = (TotalSSq-TotalSum**2/totalPix)/(totalPix-1) 
     # use (totalPix) instead of (totalPix-1) if want to compute the exact variance of the given data
     # use (totalPix-1) if data are samples of a larger population
-    std = np.sqrt(var)
+    std = np.sqrt(var).flatten().tolist()
     
     end_time = time.time()-start_time
     print('Total time for dyno calculation taken: %.6f seconds' % end_time)
     print('Time taken per image for dyno calculation: %.6f seconds' % (end_time/len(paths)))
     del Sums, SSq
-    return {'mean':mean.flatten().tolist(),'std':std.flatten().tolist()}
+    if grayscale:
+        mean.append(mean[0])
+        mean.append(mean[0])
+        std.append(std[0])
+        std.append(std[0])
+    return {'mean':mean,'std':std}
 
 
 def default_loader(path):

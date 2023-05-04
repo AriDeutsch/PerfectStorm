@@ -78,10 +78,12 @@ def get_params(opt, size):
     return {'crop_pos': (x, y), 'flip': flip}
 
 
-def get_transform(opt, params=None, grayscale=False, method=transforms.InterpolationMode.BICUBIC, convert=True):
+def get_transform(opt, params=None, grayscale=False, method=transforms.InterpolationMode.BICUBIC, convert=True, stats=None, Grey3Ch=False):
     transform_list = []
     if grayscale:
         transform_list.append(transforms.Grayscale(1))
+    if Grey3Ch:
+        transform_list.append(transforms.Grayscale(3))
     if 'resize' in opt.preprocess:
         osize = [opt.load_size, opt.load_size]
         transform_list.append(transforms.Resize(osize, method))
@@ -105,10 +107,13 @@ def get_transform(opt, params=None, grayscale=False, method=transforms.Interpola
 
     if convert:
         transform_list += [transforms.ToTensor()]
-        if grayscale:
-            transform_list += [transforms.Normalize((0.5,), (0.5,))]
-        else:
-            transform_list += [transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        if stats==None:
+            if grayscale:
+                transform_list += [transforms.Normalize((0.5,), (0.5,))]
+            else:
+                transform_list += [transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        else: # Use dynamically calculated stats
+            transform_list += [transforms.Normalize(stats['mean'],stats['std'])]
     return transforms.Compose(transform_list)
 
 
