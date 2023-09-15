@@ -18,7 +18,7 @@ else:
     VisdomExceptionBase = ConnectionError
 
 
-def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256, use_wandb=False):
+def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256, use_wandb=False, dyno_stats=None):
     """Save images to the disk.
 
     Parameters:
@@ -27,6 +27,7 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256, use_w
         image_path (str)         -- the string is used to create image paths
         aspect_ratio (float)     -- the aspect ratio of saved images
         width (int)              -- the images will be resized to width x width
+        dyno_stats (dict)        -- Used for inverse normalisation if dyno was used
 
     This function will save images stored in 'visuals' to the HTML file specified by 'webpage'.
     """
@@ -38,7 +39,7 @@ def save_images(webpage, visuals, image_path, aspect_ratio=1.0, width=256, use_w
     ims, txts, links = [], [], []
     ims_dict = {}
     for label, im_data in visuals.items():
-        im = util.tensor2im(im_data)
+        im = util.tensor2im(im_data, dyno_stats=dyno_stats)
         image_name = '%s_%s.png' % (name, label)
         save_path = os.path.join(image_dir, image_name)
         util.save_image(im, save_path, aspect_ratio=aspect_ratio)
@@ -79,7 +80,7 @@ class Visualizer():
         self.wandb_project_name = opt.wandb_project_name
         self.current_epoch = 0
         self.ncols = opt.display_ncols
-
+        
         if self.display_id > 0:  # connect to a visdom server given <display_port> and <display_server>
             import visdom
             self.vis = visdom.Visdom(server=opt.display_server, port=opt.display_port, env=opt.display_env)
@@ -136,7 +137,7 @@ class Visualizer():
                 images = []
                 idx = 0
                 for label, image in visuals.items():
-                    image_numpy = util.tensor2im(image)
+                    image_numpy = util.tensor2im(image, dyno_stats=self.opt.dyno_stats)
                     label_html_row += '<td>%s</td>' % label
                     images.append(image_numpy.transpose([2, 0, 1]))
                     idx += 1
@@ -163,7 +164,7 @@ class Visualizer():
                 idx = 1
                 try:
                     for label, image in visuals.items():
-                        image_numpy = util.tensor2im(image)
+                        image_numpy = util.tensor2im(image, dyno_stats=self.opt.dyno_stats)
                         self.vis.image(image_numpy.transpose([2, 0, 1]), opts=dict(title=label),
                                        win=self.display_id + idx)
                         idx += 1
@@ -177,7 +178,7 @@ class Visualizer():
             table_row = [epoch]
             ims_dict = {}
             for label, image in visuals.items():
-                image_numpy = util.tensor2im(image)
+                image_numpy = util.tensor2im(image, dyno_stats=self.opt.dyno_stats)
                 wandb_image = wandb.Image(image_numpy)
                 table_row.append(wandb_image)
                 ims_dict[label] = wandb_image
@@ -191,7 +192,7 @@ class Visualizer():
             self.saved = True
             # save images to the disk
             for label, image in visuals.items():
-                image_numpy = util.tensor2im(image)
+                image_numpy = util.tensor2im(image, dyno_stats=self.opt.dyno_stats)
                 img_path = os.path.join(self.img_dir, 'epoch%.3d_%s.png' % (epoch, label))
                 util.save_image(image_numpy, img_path)
 
@@ -202,7 +203,7 @@ class Visualizer():
                 ims, txts, links = [], [], []
 
                 for label, image_numpy in visuals.items():
-                    image_numpy = util.tensor2im(image)
+                    image_numpy = util.tensor2im(image, dyno_stats=self.opt.dyno_stats)
                     img_path = 'epoch%.3d_%s.png' % (n, label)
                     ims.append(img_path)
                     txts.append(label)

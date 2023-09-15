@@ -26,7 +26,6 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--continue_train', action='store_true', help='continue training: load the latest model')
         parser.add_argument('--epoch_count', type=int, default=1, help='the starting epoch count, we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>, ...')
         parser.add_argument('--phase', type=str, default='train', help='train, val, test, etc')
-        parser.add_argument('--dyno', action='store_true', help='Calculate new normalisation stats for the combined images in domain A and B. Saved stats will be loaded and used for inverse normalisation and test phase.')
         # training parameters
         parser.add_argument('--n_epochs', type=int, default=100, help='number of epochs with the initial learning rate')
         parser.add_argument('--n_epochs_decay', type=int, default=100, help='number of epochs to linearly decay learning rate to zero')
@@ -36,6 +35,8 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--pool_size', type=int, default=50, help='the size of image buffer that stores previously generated images')
         parser.add_argument('--lr_policy', type=str, default='linear', help='learning rate policy. [linear | step | plateau | cosine]')
         parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
-
+        # data-augmentation and normalisation options
+        parser.add_argument('--dyno', action='store_true', help='Calculate new normalisation stats for the combined images in domain A and B. Saved stats will be loaded and used for inverse normalisation and test phase.')
+        parser.add_argument('--col_jit', action='store_true', help='Perform torchvision\'s color jitter.')
         self.isTrain = True
         return parser

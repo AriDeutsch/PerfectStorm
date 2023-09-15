@@ -5,6 +5,7 @@ from util.util import mkdirs
 from PIL import Image
 import random
 import json
+import numpy as np
 
 
 class UnalignedDataset(BaseDataset):
@@ -35,16 +36,16 @@ class UnalignedDataset(BaseDataset):
         
         # Only calculate if train phase, if dyno requested, and no stats file exists already
         if opt.isTrain and opt.dyno and not os.path.isfile(stats_file):        
-            self.opt.dyno_stats = dynamic_normalisation(self.A_paths,self.B_paths, grayscale = self.opt.Grey3Ch)
+            self.opt.dyno_stats,self.opt.statsA,self.opt.statsB = dynamic_normalisation(self.A_paths,self.B_paths, grayscale = self.opt.Grey3Ch)
             stats_file = os.path.join(opt.checkpoints_dir, opt.name, 'stats.json')
             with open(stats_file, 'w') as f:
-                json.dump(self.opt.dyno_stats, f)   # save the stats 
+                json.dump((self.opt.dyno_stats,self.opt.statsA,self.opt.statsB), f)   # save the stats 
         # If the stats file exists, load the stats, regardless of phase
         elif os.path.isfile(stats_file):
             with open(stats_file, 'r') as f:
-                self.opt.dyno_stats = json.load(f)  # load the stats
+                self.opt.dyno_stats,self.opt.statsA,self.opt.statsB = json.load(f)  # load the stats
         else:
-            self.opt.dyno_stats = None  # If no stats file exists, and it's not train phase or no dyno requested, use standard 0.5 level stats
+            self.opt.dyno_stats=self.opt.statsA=self.opt.statsB = None  # If no stats file exists, and it's not train phase or no dyno requested, use standard 0.5-level stats
             
         
  
@@ -55,8 +56,16 @@ class UnalignedDataset(BaseDataset):
         output_nc = self.opt.input_nc if btoA else self.opt.output_nc      # get the number of channels of output image
         if self.opt.Grey3Ch:
             assert (input_nc==3 and output_nc==3), "Number of in and out channels should be 3 if you want 3 channel greyscale."
-        self.transform_A = get_transform(self.opt, grayscale=(input_nc == 1), Grey3Ch = self.opt.Grey3Ch, stats = self.opt.dyno_stats)
-        self.transform_B = get_transform(self.opt, grayscale=(output_nc == 1), Grey3Ch = self.opt.Grey3Ch, stats = self.opt.dyno_stats)
+            
+        # Calculate a rough measure in the saturation difference between 
+        # domain A and B, and pass the ratio to get_transform, 
+        # dependent on which domain has higher saturation
+        RelativeSaturationA = np.std(self.opt.statsA['mean'])
+        RelativeSaturationB = np.std(self.opt.statsB['mean'])
+        SatScaleA = (RelativeSaturationB/RelativeSaturationA)
+        SatScaleB = 1/SatScaleA
+        self.transform_A = get_transform(self.opt, grayscale=(input_nc == 1), Grey3Ch = self.opt.Grey3Ch, stats = self.opt.dyno_stats, col_jit = self.opt.col_jit, SatScale=SatScaleA if SatScaleA>1 else None)
+        self.transform_B = get_transform(self.opt, grayscale=(output_nc == 1), Grey3Ch = self.opt.Grey3Ch, stats = self.opt.dyno_stats, col_jit = self.opt.col_jit, SatScale=None if SatScaleA>1 else SatScaleB)
 
     def __getitem__(self, index):
         """Return a data point and its metadata information.

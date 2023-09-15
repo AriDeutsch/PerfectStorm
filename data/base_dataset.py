@@ -78,12 +78,18 @@ def get_params(opt, size):
     return {'crop_pos': (x, y), 'flip': flip}
 
 
-def get_transform(opt, params=None, grayscale=False, method=transforms.InterpolationMode.BICUBIC, convert=True, stats=None, Grey3Ch=False):
+def get_transform(opt, params=None, grayscale=False, method=transforms.InterpolationMode.BICUBIC, convert=True, stats=None, Grey3Ch=False, col_jit = False, SatScale=None):
     transform_list = []
     if grayscale:
         transform_list.append(transforms.Grayscale(1))
     if Grey3Ch:
         transform_list.append(transforms.Grayscale(3))
+    if col_jit: # Color Jitter
+        if SatScale==None:
+            transform_list.append(transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=[0.5,1], hue=0))
+        else:
+            transform_list.append(transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=[0.5*SatScale,SatScale], hue=0)) # Only scale if the domain has the higher saturation
+    
     if 'resize' in opt.preprocess:
         osize = [opt.load_size, opt.load_size]
         transform_list.append(transforms.Resize(osize, method))
@@ -114,6 +120,7 @@ def get_transform(opt, params=None, grayscale=False, method=transforms.Interpola
                 transform_list += [transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
         else: # Use dynamically calculated stats
             transform_list += [transforms.Normalize(stats['mean'],stats['std'])]
+        
     return transforms.Compose(transform_list)
 
 
